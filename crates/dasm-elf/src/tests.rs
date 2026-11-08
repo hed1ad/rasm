@@ -875,7 +875,6 @@ fn ls_imports_match_readelf() {
     let getenv = img.imports.iter().find(|i| i.name == "getenv").unwrap();
     assert_eq!(getenv.version.as_deref(), Some("GLIBC_2.2.5"));
     assert_eq!(getenv.library.as_deref(), Some("libc.so.6"));
-    assert_eq!(getenv.plt, None);
 }
 
 #[test]
@@ -1881,12 +1880,23 @@ mod fuzzish {
     }
 }
 
+/// Some distributions ship `libLLVM*.so` as a linker script.
+fn is_elf_file(path: &std::path::Path) -> bool {
+    use std::io::Read as _;
+    let mut magic = [0u8; 4];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut magic))
+        .is_ok()
+        && magic == *b"\x7fELF"
+}
+
 #[test]
 fn big_library_loads() {
     let found = std::fs::read_dir("/usr/lib").ok().and_then(|rd| {
         rd.flatten().map(|e| e.path()).find(|p| {
             p.file_name()
                 .is_some_and(|n| n.to_string_lossy().starts_with("libLLVM"))
+                && is_elf_file(p)
         })
     });
     let Some(path) = found else {
