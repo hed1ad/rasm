@@ -1,0 +1,18 @@
+[package]
+name = "dasm-elf"
+description = "ELF loader for dasm: segments, sections, symbols, relocations, PLT/GOT, DWARF and .eh_frame function hints"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+dasm-core = { workspace = true }
+gimli = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true

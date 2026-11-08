@@ -1,0 +1,18 @@
+[package]
+name = "dasm-x86"
+description = "x86/x86-64 decoder for dasm built on iced-x86"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+dasm-core = { workspace = true }
+iced-x86 = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true

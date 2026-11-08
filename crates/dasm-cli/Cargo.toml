@@ -1,0 +1,31 @@
+[package]
+name = "dasm-cli"
+description = "Command-line interface of dasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dasm"
+path = "src/main.rs"
+
+[dependencies]
+dasm-core = { workspace = true }
+dasm-elf = { workspace = true }
+dasm-x86 = { workspace = true }
+dasm-analysis = { workspace = true }
+dasm-db = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+# `mock` only in tests: the CLI logic is tested on the synthetic program
+# until the real loader and scheduler are wired in (wave C).
+dasm-core = { workspace = true, features = ["mock"] }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

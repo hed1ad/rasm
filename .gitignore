@@ -1,0 +1,12 @@
+/target/
+/build/
+/tests/fixtures/bin/
+/fuzz/artifacts/
+/fuzz/corpus/
+*.dasm
+*.dasm-wal
+*.dasm-shm
+
+# Local process notes, review reports and agent configuration
+/docs/internal/
+/.claude/

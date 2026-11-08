@@ -1,0 +1,102 @@
+# Fuzzing harness for dasm (owner: Security). A separate workspace: it is not
+# a member of the root workspace, so `cargo build/test` at the root never
+# needs libFuzzer or a nightly toolchain.
+#
+# Two ways to run the same target logic (`dasm_fuzz::<target>::run`):
+#   cargo +nightly fuzz run journal_replay          # coverage-guided (cargo-fuzz)
+#   cargo test --release                            # stable smoke: 100k inputs/target
+# See README.md.
+
+[package]
+name = "dasm-fuzz"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+members = ["."]
+
+[features]
+default = []
+# Enable once Backend #1 merges `ElfLoader` (`dasm-elf`): elf_load, eh_frame, dwarf.
+elf = ["dep:dasm-elf"]
+# Enable once Backend #2 merges `X86_64` (`dasm-x86`): x86_decode.
+x86 = ["dep:dasm-x86"]
+
+[dependencies]
+dasm-core = { path = "../crates/dasm-core" }
+dasm-elf = { path = "../crates/dasm-elf", optional = true }
+dasm-x86 = { path = "../crates/dasm-x86", optional = true }
+serde_json = "1.0.154"
+libfuzzer-sys = "0.4"
+
+[dev-dependencies]
+dasm-core = { path = "../crates/dasm-core", features = ["mock"] }
+serde = "1.0.229"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[profile.release]
+debug = 1
+# libFuzzer needs panics to abort so that they are reported as crashes.
+# cargo-fuzz sets this itself; kept explicit for `cargo build --release`.
+overflow-checks = true
+
+[[bin]]
+name = "journal_replay"
+path = "fuzz_targets/journal_replay.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "memory_read"
+path = "fuzz_targets/memory_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "operation_json"
+path = "fuzz_targets/operation_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "elf_load"
+path = "fuzz_targets/elf_load.rs"
+test = false
+doc = false
+bench = false
+required-features = ["elf"]
+
+[[bin]]
+name = "eh_frame"
+path = "fuzz_targets/eh_frame.rs"
+test = false
+doc = false
+bench = false
+required-features = ["elf"]
+
+[[bin]]
+name = "dwarf"
+path = "fuzz_targets/dwarf.rs"
+test = false
+doc = false
+bench = false
+required-features = ["elf"]
+
+[[bin]]
+name = "x86_decode"
+path = "fuzz_targets/x86_decode.rs"
+test = false
+doc = false
+bench = false
+required-features = ["x86"]

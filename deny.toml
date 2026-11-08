@@ -1,0 +1,86 @@
+# cargo-deny policy for dasm (owner: Security). Run: `cargo deny check`.
+# Covers the root workspace (Cargo.lock); the fuzz harness has its own
+# lockfile: `cargo deny --manifest-path fuzz/Cargo.toml check`.
+#
+# dasm is Apache-2.0 and ships binaries (CLI, Qt GUI). Allowed licenses are
+# those whose terms let us distribute a combined Apache-2.0 binary without
+# relicensing it. Copyleft is excluded except MPL-2.0 (file-level copyleft,
+# compatible with Apache-2.0 as long as MPL files stay MPL and their source
+# remains available; see docs/security/dependencies.md).
+
+[graph]
+all-features = true
+# Linux first; keep Windows/macOS-only crates visible in the graph so that
+# their licenses are checked too.
+targets = []
+
+[advisories]
+# RustSec advisory database. Any vulnerability, unsound or unmaintained
+# advisory for a crate in the graph fails the check (cargo-deny 0.18+ fails
+# on vulnerabilities unconditionally).
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+# Accepted advisories, each with a reason and a review date.
+ignore = []
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "CC0-1.0",
+    "BSL-1.0",
+    # libFuzzer (LLVM, via libfuzzer-sys) in the fuzz harness only; permissive.
+    "NCSA",
+    # imbl (persistent maps, ADR 0002). Weak, file-level copyleft: we use it
+    # unmodified. Any patch to imbl must be published under MPL-2.0.
+    "MPL-2.0",
+]
+confidence-threshold = 0.93
+# The allow list is a policy, not an inventory: unused entries are fine.
+unused-allowed-license = "allow"
+exceptions = []
+
+# Our own crates are `publish = false` and Apache-2.0; do not require them
+# to be in `allow` through the registry rules.
+[licenses.private]
+ignore = true
+
+[bans]
+# Duplicate versions bloat the binary and double the audit surface. Warn,
+# not deny: transitive duplicates are often outside our control. Deny
+# selected crates below when a duplicate would matter.
+multiple-versions = "warn"
+wildcards = "deny"
+# Path dependencies inside the workspace are not wildcards.
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+    # OpenSSL: we need no TLS; keep it out of the graph (attack surface,
+    # license history). sha2 is pure Rust.
+    { crate = "openssl-sys" },
+    { crate = "openssl" },
+    # Exactly one copy of each crate that parses untrusted input: two
+    # versions would mean two parsers to fuzz and to patch.
+    { crate = "cpp_demangle", deny-multiple-versions = true },
+    { crate = "rustc-demangle", deny-multiple-versions = true },
+    { crate = "gimli", deny-multiple-versions = true },
+    { crate = "iced-x86", deny-multiple-versions = true },
+    { crate = "serde_json", deny-multiple-versions = true },
+    { crate = "rusqlite", deny-multiple-versions = true },
+    { crate = "libsqlite3-sys", deny-multiple-versions = true },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

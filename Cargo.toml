@@ -1,0 +1,100 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/dasm-core",
+    "crates/dasm-elf",
+    "crates/dasm-x86",
+    "crates/dasm-analysis",
+    "crates/dasm-db",
+    "crates/dasm-cli",
+    "crates/dasm-qt",
+    "tests",
+]
+# Everything except the Qt bridge and the slow QA crate: `cargo
+# build/test/clippy` without `--workspace` needs no Qt and skips the 60+ s
+# oracle tests. Full runs (`--workspace`) need qt6-base (ADR 0001).
+default-members = [
+    "crates/dasm-core",
+    "crates/dasm-elf",
+    "crates/dasm-x86",
+    "crates/dasm-analysis",
+    "crates/dasm-db",
+    "crates/dasm-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+publish = false
+
+# Single source of truth for third-party versions (see docs/adr/0001).
+# Member crates use `foo = { workspace = true }`.
+[workspace.dependencies]
+# internal
+dasm-core = { path = "crates/dasm-core" }
+dasm-elf = { path = "crates/dasm-elf" }
+dasm-x86 = { path = "crates/dasm-x86" }
+dasm-analysis = { path = "crates/dasm-analysis" }
+dasm-db = { path = "crates/dasm-db" }
+
+# core model
+arc-swap = "1.9.3"
+imbl = "7.0.2"
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+
+# loaders / decoders
+gimli = { version = "0.34.0", default-features = false, features = ["read", "std"] }
+iced-x86 = { version = "1.22.0", default-features = false, features = ["std", "decoder", "intel", "instr_info"] }
+memmap2 = "0.9.12"
+libc = "0.2.191"
+# demangling (both MIT OR Apache-2.0)
+rustc-demangle = "0.1.28"
+cpp_demangle = "0.5.1"
+
+# analysis
+rayon = "1.12.0"
+crossbeam-channel = "0.5.17"
+
+# storage
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+sha2 = "0.11.1"
+
+# cli
+clap = { version = "4.6.7", features = ["derive"] }
+anyhow = "1.0.104"
+tracing = "0.1.44"
+
+# ui bridge
+cxx = "1.0.205"
+cxx-qt = "0.10.0"
+cxx-qt-lib = { version = "0.10.0", default-features = false }
+cxx-qt-build = "0.10.0"
+
+# testing
+proptest = "1.12.0"
+insta = { version = "1.49.0", features = ["json"] }
+tempfile = "3.27.0"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
+indexing_slicing = "warn"
+dbg_macro = "deny"
+todo = "warn"
+
+[profile.release]
+debug = "line-tables-only"
+lto = "thin"
+
+[profile.dev.package."*"]
+opt-level = 2

@@ -1,0 +1,23 @@
+[package]
+name = "dasm-db"
+description = "SQLite project store for dasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+dasm-core = { workspace = true }
+rusqlite = { workspace = true, features = ["hooks", "limits"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# `mock` only in tests: shared contract tests against `InMemoryStore`.
+dasm-core = { workspace = true, features = ["mock"] }
+rusqlite = { workspace = true, features = ["hooks", "limits"] }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

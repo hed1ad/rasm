@@ -1,0 +1,27 @@
+[package]
+name = "dasm-qt"
+description = "Rust side of the dasm Qt UI bridge (cxx-qt)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+dasm-core = { workspace = true, features = ["mock"] }
+dasm-elf = { workspace = true }
+dasm-x86 = { workspace = true }
+dasm-analysis = { workspace = true }
+dasm-db = { workspace = true }
+cxx = { workspace = true }
+cxx-qt = { workspace = true }
+cxx-qt-lib = { workspace = true }
+
+[build-dependencies]
+cxx-qt-build = { workspace = true }
+
+[lints]
+workspace = true

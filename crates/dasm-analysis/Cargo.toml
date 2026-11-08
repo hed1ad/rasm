@@ -1,0 +1,20 @@
+[package]
+name = "dasm-analysis"
+description = "Analysis pass graph and scheduler for dasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+dasm-core = { workspace = true }
+rayon = { workspace = true }
+crossbeam-channel = { workspace = true }
+
+[dev-dependencies]
+dasm-core = { workspace = true, features = ["mock"] }
+dasm-x86 = { workspace = true }
+
+[lints]
+workspace = true

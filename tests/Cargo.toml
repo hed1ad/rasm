@@ -1,0 +1,24 @@
+# QA test crate, member of the root workspace (ADR 0001). Not in
+# `default-members`: plain `cargo test` skips the slow oracle tests; run with
+#   cargo test -p dasm-tests
+[package]
+name = "dasm-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Contract, scenario and golden tests for dasm (QA zone)"
+
+[dependencies]
+dasm-core = { workspace = true, features = ["mock"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bench]]
+name = "analyze"
+path = "../benches/analyze.rs"
+harness = false
+
+[lints]
+workspace = true

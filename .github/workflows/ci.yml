@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+
+# Supported build platforms (ADR 0005): Arch Linux (rolling) and Debian 13
+# (Qt 6.8). Ubuntu 24.04 (Qt 6.4) is served by Flatpak/AppImage and is not
+# built here.
+#
+# `rust` runs the default workspace members (no Qt needed, see ADR 0001);
+# `full` adds dasm-qt (`--workspace`) and the C++ UI, with Qt installed.
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: arch
+            image: archlinux:latest
+          - os: debian13
+            image: debian:trixie
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install toolchain (Arch)
+        if: matrix.os == 'arch'
+        run: pacman -Syu --noconfirm --needed rust gcc clang git
+      - name: Install toolchain (Debian)
+        if: matrix.os == 'debian13'
+        # Debian's rustc is older than our MSRV (1.88): use rustup stable.
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential ca-certificates curl git pkg-config
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --component rustfmt,clippy
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+      - name: Toolchain version
+        id: rustc
+        run: echo "version=$(rustc -V | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ matrix.os }}-${{ steps.rustc.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: rust-${{ matrix.os }}-${{ steps.rustc.outputs.version }}-
+      - name: rustfmt
+        if: matrix.os == 'arch'
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+      - name: test
+        run: cargo test --all-features --locked
+      - name: docs
+        if: matrix.os == 'arch'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --no-deps --all-features --locked
+
+  golden:
+    name: QA golden tests (arch)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install toolchain and fixture compilers
+        run: pacman -Syu --noconfirm --needed rust gcc clang binutils musl git go
+      - uses: actions/checkout@v4
+      - name: Check for QA crate
+        id: cfg
+        run: |
+          if [ -f tests/Cargo.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT";
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::tests/ not present yet (owned by QA); skipping"; fi
+      - name: Toolchain version
+        id: rustc
+        run: echo "version=$(rustc -V | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: steps.cfg.outputs.present == 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            tests/target
+          key: golden-${{ steps.rustc.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: golden-${{ steps.rustc.outputs.version }}-
+      - name: Build CLI
+        if: steps.cfg.outputs.present == 'true'
+        run: cargo build -p dasm-cli --locked
+      - name: Build fixtures
+        if: steps.cfg.outputs.present == 'true'
+        # TODO(wave C): switch to `build.sh --strict` once the full compiler matrix is in the image.
+        run: scripts/fixtures/build.sh
+      - name: QA tests
+        if: steps.cfg.outputs.present == 'true'
+        env:
+          DASM_BIN: ${{ github.workspace }}/target/debug/dasm
+          DASM_STRICT: "1"
+        run: |
+          # Until QA moves tests/ into the root workspace (ADR 0001, 6a) it is a
+          # standalone workspace with its own Cargo.lock.
+          if grep -q '^\[workspace\]' tests/Cargo.toml; then
+            cargo test --manifest-path tests/Cargo.toml --locked
+          else
+            cargo test -p dasm-tests --locked
+          fi
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for deny.toml
+        id: cfg
+        run: |
+          if [ -f deny.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT";
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::deny.toml not present yet (owned by Security); skipping"; fi
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        if: steps.cfg.outputs.present == 'true'
+        with:
+          command: check
+
+  full:
+    name: workspace + UI (${{ matrix.os }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: arch
+            image: archlinux:latest
+          - os: debian13
+            image: debian:trixie
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install toolchain and Qt (Arch)
+        if: matrix.os == 'arch'
+        run: pacman -Syu --noconfirm --needed rust gcc cmake ninja git qt6-base qt-advanced-docking-system
+      - name: Install toolchain and Qt (Debian)
+        if: matrix.os == 'debian13'
+        # Qt ADS is not packaged here: ui/CMakeLists.txt falls back to FetchContent.
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential ca-certificates curl git pkg-config \
+            cmake ninja-build qt6-base-dev qt6-base-dev-tools qt6-base-private-dev libgl-dev
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --component clippy
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "QMAKE=/usr/lib/qt6/bin/qmake" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - name: Toolchain version
+        id: rustc
+        run: echo "version=$(rustc -V | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            build/cargo
+          key: full-${{ matrix.os }}-${{ steps.rustc.outputs.version }}-${{ hashFiles('Cargo.lock', 'ui/CMakeLists.txt') }}
+          restore-keys: full-${{ matrix.os }}-${{ steps.rustc.outputs.version }}-
+      - name: clippy (whole workspace, incl. dasm-qt)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: test (whole workspace, incl. dasm-qt)
+        run: cargo test --workspace --all-features --locked
+      - name: Check for ui/
+        id: cfg
+        run: |
+          if [ -f ui/CMakeLists.txt ]; then echo "present=true" >> "$GITHUB_OUTPUT";
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "::notice::ui/ not present yet (owned by Frontend); skipping UI build"; fi
+      - name: Configure UI
+        if: steps.cfg.outputs.present == 'true'
+        run: cmake -S ui -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build UI
+        if: steps.cfg.outputs.present == 'true'
+        run: cmake --build build --parallel
+      - name: UI smoke test
+        if: steps.cfg.outputs.present == 'true'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure
